@@ -2,3 +2,6 @@
 *.jpg
 processed_pics
 test_pics
+main.spec
+dist
+build

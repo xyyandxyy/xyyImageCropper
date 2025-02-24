@@ -10,6 +10,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen
 from PyQt5.QtCore import Qt, QRect, QPoint
 
+# 选择使用的路径格式：
+# 设置 FORMAT_MODE 为 "windows" 则采用 Windows 格式，
+# 设置为 "unix" 则采用 mac/linux/UNIX 系统的格式。
+FORMAT_MODE = "windows"  # 或者 "unix"
+
 # 自定义的 QLabel，用于显示图片并支持 ROI 选取
 class ImageLabel(QLabel):
     def __init__(self, parent=None):
@@ -105,12 +110,10 @@ class MainWindow(QMainWindow):
     def initUI(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
         # 左侧：图片显示区域
         self.imageLabel = ImageLabel()
         # 设定左上对齐，防止图片出现偏移
         self.imageLabel.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-
         # 右侧：操作说明和按钮区域
         instructions = (
             "按键说明：\n"
@@ -125,7 +128,6 @@ class MainWindow(QMainWindow):
         self.instructionText.setReadOnly(True)
         self.instructionText.setText(instructions)
         self.statusLabel = QLabel("状态：")
-
         self.saveBtn = QPushButton("保存 ROI")
         self.resetBtn = QPushButton("重置 ROI")
         self.prevBtn = QPushButton("上一个")
@@ -135,7 +137,6 @@ class MainWindow(QMainWindow):
         self.resetBtn.clicked.connect(self.resetROI)
         self.prevBtn.clicked.connect(self.prevImage)
         self.nextBtn.clicked.connect(self.nextImage)
-
         right_layout = QVBoxLayout()
         right_layout.addWidget(QLabel("<b>操作说明</b>"))
         right_layout.addWidget(self.instructionText)
@@ -145,7 +146,6 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.prevBtn)
         right_layout.addWidget(self.nextBtn)
         right_layout.addStretch()
-
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.imageLabel, 1)
         main_layout.addLayout(right_layout, 0)
@@ -153,7 +153,12 @@ class MainWindow(QMainWindow):
 
     def loadCurrentImage(self):
         image_path = self.image_paths[self.current_index]
-        self.original_cv_image = cv2.imread(str(image_path))
+        # 根据 FORMAT_MODE 选择合适的路径字符串
+        if FORMAT_MODE == "windows":
+            image_file = str(image_path)
+        else:
+            image_file = image_path.as_posix()
+        self.original_cv_image = cv2.imread(image_file)
         if self.original_cv_image is None:
             self.statusBar().showMessage(f"无法加载图片 {image_path.name}", 2000)
             return
@@ -181,13 +186,16 @@ class MainWindow(QMainWindow):
         cropped = self.original_cv_image[y:y+h, x:x+w]
         image_path = self.image_paths[self.current_index]
         dest_path = self.dest_folder / image_path.name
-        cv2.imwrite(str(dest_path), cropped)
-        # 使用状态栏显示一闪而过的提示信息，无需点击确认
-        self.statusBar().showMessage(f"图片已保存到：{dest_path}", 2000)
-
+        # 根据 FORMAT_MODE 选择合适的路径格式
+        if FORMAT_MODE == "windows":
+            dest_file = str(dest_path)
+        else:
+            dest_file = dest_path.as_posix()
+        cv2.imwrite(dest_file, cropped)
+        self.statusBar().showMessage(f"图片已保存到：{dest_file}", 2000)
         # 如果当前已经是最后一张图片，则全部处理完毕，退出程序
         if self.current_index == len(self.image_paths) - 1:
-            self.statusBar().showMessage("所有图片处理完毕，程序将关闭。", 2000)
+            self.statusBar().showMessage("所有图片处理完毕，程序将关闭，感谢你使用。", 2000)
             QApplication.instance().processEvents()  # 刷新事件，显示状态消息
             QApplication.instance().quit()
         else:
@@ -235,7 +243,6 @@ if __name__ == '__main__':
     dest_folder = QFileDialog.getExistingDirectory(None, "选择目标文件夹", os.getcwd())
     if not dest_folder:
         sys.exit("未选择目标文件夹，程序退出。")
-
     window = MainWindow(src_folder, dest_folder)
     window.resize(1000, 600)
     window.show()
