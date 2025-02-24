@@ -1,5 +1,7 @@
 # xyy的图片数据选取标注软件
 
+<img src=".\asset\demo.png" alt="demo" style="zoom:50%;" />
+
 #### 0. Introduction
 
 这是一款基于 PyQt5 和 OpenCV 的图片批量手动切割工具, 主要用于从大量图片中按需裁剪出指定区域 (ROI). 
@@ -34,7 +36,8 @@ python main.py
 
 #### 3. Packaging
 
+in Windows:
 ```
-pyinstaller --onefile --windowed --icon=favicon.ico main.py
+pyinstaller --onefile --windowed --icon=favicon.ico --add-data "favicon.ico;." main.py
 ```
 
