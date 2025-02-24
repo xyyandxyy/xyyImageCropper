@@ -5,10 +5,10 @@ import numpy as np
 from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QPushButton, QTextEdit,
-    QHBoxLayout, QVBoxLayout, QFileDialog
+    QHBoxLayout, QVBoxLayout, QFileDialog, QMessageBox
 )
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen
-from PyQt5.QtCore import Qt, QRect, QPoint
+from PyQt5.QtCore import Qt, QRect
 
 # 选择使用的路径格式：
 # 设置 FORMAT_MODE 为 "windows" 则采用 Windows 格式，
@@ -88,10 +88,11 @@ class ImageLabel(QLabel):
         self.endPoint = None
         self.update()
 
+
 class MainWindow(QMainWindow):
     def __init__(self, src_folder, dest_folder, max_width=800):
         super().__init__()
-        self.setWindowTitle("图片标注软件 - ROI 选择")
+        self.setWindowTitle("xyy的图片批量手动切割工具")
         self.src_folder = Path(src_folder)
         self.dest_folder = Path(dest_folder)
         self.dest_folder.mkdir(parents=True, exist_ok=True)
@@ -118,17 +119,17 @@ class MainWindow(QMainWindow):
         instructions = (
             "按键说明：\n"
             "1. 鼠标左键拖动选择需要保留的区域（ROI）。\n"
-            "2. 按 空格 或 回车 键：\n"
+            "2. 按 回车 键 (你可以一直把手放到这)：\n"
             "     保存当前 ROI 并切换到下一张图片（当前图片必须完成 ROI 选择，否则无法切换）。\n"
             "3. 按 ESC 键：重置当前 ROI 选择。\n"
             "4. 点击 “上一个” 按钮：返回上一张图片，可重新选择 ROI（保存后将覆盖原先版本）。\n"
-            "5. 当所有图片处理完毕后，按 空格 或 回车 键将关闭程序。"
+            "5. 当所有图片处理完毕后，会弹出完成提示，按回车或点击“确定”关闭程序。"
         )
         self.instructionText = QTextEdit()
         self.instructionText.setReadOnly(True)
         self.instructionText.setText(instructions)
         self.statusLabel = QLabel("状态：")
-        self.saveBtn = QPushButton("保存 ROI")
+        self.saveBtn = QPushButton("保存 ROI (快捷键:回车)")
         self.resetBtn = QPushButton("重置 ROI")
         self.prevBtn = QPushButton("上一个")
         # “下一个”按钮仅做显示，但其功能与确认保存 ROI 保持一致
@@ -193,11 +194,13 @@ class MainWindow(QMainWindow):
             dest_file = dest_path.as_posix()
         cv2.imwrite(dest_file, cropped)
         self.statusBar().showMessage(f"图片已保存到：{dest_file}", 2000)
-        # 如果当前已经是最后一张图片，则全部处理完毕，退出程序
+
+        # 判断是否为最后一张图片
         if self.current_index == len(self.image_paths) - 1:
-            self.statusBar().showMessage("所有图片处理完毕，程序将关闭，感谢你使用。", 2000)
-            QApplication.instance().processEvents()  # 刷新事件，显示状态消息
-            QApplication.instance().quit()
+            # 弹出提示框，等待用户按回车或点击确定关闭程序
+            ret = QMessageBox.information(self, "处理完毕", "所有图片处理完毕，xyy感谢你。", QMessageBox.Ok)
+            if ret == QMessageBox.Ok:
+                QApplication.instance().quit()
         else:
             self.current_index += 1
             self.loadCurrentImage()
@@ -210,7 +213,7 @@ class MainWindow(QMainWindow):
             self.current_index -= 1
             self.loadCurrentImage()
         else:
-            self.statusBar().showMessage("已经是第一张图片！", 2000)
+            self.statusBar().showMessage("已经是第一张图片, 没办法上一张了！", 2000)
 
     def nextImage(self):
         # 如果当前图片尚未选择 ROI，则提示用户
@@ -223,7 +226,8 @@ class MainWindow(QMainWindow):
     # 重载键盘事件，支持快捷键操作
     def keyPressEvent(self, event):
         key = event.key()
-        if key in (Qt.Key_Space, Qt.Key_Return):
+        # 只保留回车键快捷操作
+        if key == Qt.Key_Return:
             if self.imageLabel.getOriginalROI() is None:
                 self.statusBar().showMessage("请先选择 ROI 区域再确认！", 2000)
             else:
@@ -233,16 +237,22 @@ class MainWindow(QMainWindow):
         else:
             super().keyPressEvent(event)
 
+
 if __name__ == '__main__':
+
     app = QApplication(sys.argv)
-    # 提示选择图片所在的文件夹
+    
+    # 在弹出选择文件夹对话框前，显示消息提示，让用户明确当前操作
+    QMessageBox.information(None, "选择要处理的图片的文件夹", "请选择包含要处理的图片文件夹，我们将处理其中的jpg和png文件。")
     src_folder = QFileDialog.getExistingDirectory(None, "选择图片文件夹", os.getcwd())
     if not src_folder:
-        sys.exit("未选择图片文件夹，程序退出。")
-    # 提示选择保存处理后图片的目标文件夹
-    dest_folder = QFileDialog.getExistingDirectory(None, "选择目标文件夹", os.getcwd())
+        sys.exit("你没有选择存放图片的文件夹，程序退出。")
+    
+    QMessageBox.information(None, "选择导出图片的文件夹", "请选择导出到哪个文件夹，处理后的图片将保存在该文件夹中。")
+    dest_folder = QFileDialog.getExistingDirectory(None, "选择导出文件夹", os.getcwd())
     if not dest_folder:
-        sys.exit("未选择目标文件夹，程序退出。")
+        sys.exit("你没有选择导出图片的文件夹，程序退出。")
+    
     window = MainWindow(src_folder, dest_folder)
     window.resize(1000, 600)
     window.show()
